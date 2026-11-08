@@ -55,14 +55,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Pasang Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Pasang platform & build-tools
+      - name: Siapkan Android SDK (bawaan runner GitHub) + platform 36
         shell: bash
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKM=$(find "$SDK/cmdline-tools" -path '*/bin/sdkmanager' 2>/dev/null | sort | tail -n 1)
+          if [ -z "$SDKM" ]; then
+            echo "::error::sdkmanager tidak ditemukan di $SDK/cmdline-tools"
+            exit 1
+          fi
+          echo "SDK: $SDK"
+          echo "sdkmanager: $SDKM"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          yes | "$SDKM" --sdk_root="$SDK" --licenses > /dev/null || true
+          if ! "$SDKM" --sdk_root="$SDK" --install "platforms;android-36" "build-tools;36.0.0" > /dev/null; then
+            echo "Percobaan pertama gagal, mencoba dengan sudo..."
+            sudo env "JAVA_HOME=$JAVA_HOME" "$SDKM" --sdk_root="$SDK" --install "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          fi
+          echo "Platform terpasang:"
+          ls "$SDK/platforms"
 
       - name: Pasang Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
